@@ -1,0 +1,3 @@
+<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+
+This project is a full-stack document submission system (Docky) with a Node.js/Express backend and a React frontend. The backend handles file uploads, stores files locally, and provides APIs for submissions and admin listing. The frontend provides a user dashboard for document upload and an admin dashboard for viewing submissions. Keep code simple, clean, and suitable for hackathon deployment.
