@@ -3,13 +3,51 @@ import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import nodemailer from 'nodemailer';
 import archiver from 'archiver';
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
+import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+
+// MySQL connection setup
+import mysql from 'mysql2';
+
+dotenv.config();
+
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+db.connect((err) => {
+  if (err) {
+    console.error('Error connecting to MySQL:', err);
+    return;
+  }
+  console.log('Connected to MySQL database!');
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+
+// Rate limiting: 5 requests per minute per IP for login and signup
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5,
+  message: { error: 'Too many attempts, please try again later.' }
+});
+
+// Restrict CORS to localhost:3000 for now
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
 const uploadsDir = path.resolve('./uploads');
@@ -23,13 +61,6 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
-
-const submissionsFile = path.resolve('./submissions.json');
-if (!fs.existsSync(submissionsFile)) fs.writeFileSync(submissionsFile, '[]');
-
-// Deadline storage
-const deadlineFile = path.resolve('./deadline.json');
-if (!fs.existsSync(deadlineFile)) fs.writeFileSync(deadlineFile, 'null');
 
 // Allowed file types
 const ALLOWED_TYPES = [
@@ -48,64 +79,96 @@ const uploadMulti = multer({
   }
 });
 
-app.post('/api/submit', uploadMulti.array('documents', 10), async (req, res) => {
+// Protect sensitive routes with JWT middleware
+app.post('/api/submit', requireAuth, uploadMulti.array('documents', 10), async (req, res) => {
   const { name, email } = req.body;
-  const deadline = JSON.parse(fs.readFileSync(deadlineFile));
-  if (deadline && new Date() > new Date(deadline)) {
-    return res.status(403).json({ error: "Deadline is over, you can’t upload now." });
-  }
-  if (!name || !req.files || req.files.length === 0) return res.status(400).json({ error: 'Name and at least one document required.' });
-  const submissions = JSON.parse(fs.readFileSync(submissionsFile));
-  const entries = req.files.map(file => ({
-    name,
-    email,
-    filename: file.filename,
-    originalname: file.originalname,
-    time: new Date().toISOString()
-  }));
-  submissions.push(...entries);
-  fs.writeFileSync(submissionsFile, JSON.stringify(submissions, null, 2));
-  res.json({ success: true, files: entries.map(e => ({ filename: e.filename, originalname: e.originalname })) });
+  // Fetch the current deadline from the database
+  db.query('SELECT deadline FROM deadlines ORDER BY id DESC LIMIT 1', (err, results) => {
+    if (err) {
+      console.error('Error fetching deadline from MySQL:', err);
+      return res.status(500).json({ error: 'Failed to fetch deadline.' });
+    }
+    const deadline = results.length > 0 ? results[0].deadline : null;
+
+    if (deadline && new Date() > new Date(deadline)) {
+      return res.status(403).json({ error: "Deadline is over, you can’t upload now." });
+    }
+    if (!name || !req.files || req.files.length === 0) return res.status(400).json({ error: 'Name and at least one document required.' });
+
+    // Insert each file submission into MySQL
+    const entries = req.files.map(file => [
+      name,
+      email,
+      file.filename,
+      file.originalname,
+      new Date()
+    ]);
+
+    const sql = 'INSERT INTO submissions (name, email, filename, originalname, time) VALUES ?';
+    db.query(sql, [entries], (err, result) => {
+      if (err) {
+        console.error('Error inserting submissions:', err);
+        return res.status(500).json({ error: 'Failed to save submissions.' });
+      }
+      res.json({ success: true, files: entries.map(e => ({ filename: e[2], originalname: e[3] })) });
+    });
+  });
 });
 
-app.get('/api/submissions', (req, res) => {
-  let submissions = JSON.parse(fs.readFileSync(submissionsFile));
+app.get('/api/submissions', requireAuth, (req, res) => {
   const { search, filetype, sort } = req.query;
+  let sql = 'SELECT * FROM submissions';
+  let params = [];
+  let conditions = [];
+
   if (search) {
-    submissions = submissions.filter(sub => sub.name.toLowerCase().includes(search.toLowerCase()));
+    conditions.push('LOWER(name) LIKE ?');
+    params.push(`%${search.toLowerCase()}%`);
   }
-  if (filetype) {
-    submissions = submissions.filter(sub => {
-      const ext = path.extname(sub.originalname).toLowerCase();
-      return ext === `.${filetype.toLowerCase()}`;
-    });
+  if (filetype && filetype.toLowerCase() !== 'all') {
+    conditions.push('LOWER(SUBSTRING_INDEX(originalname, ".", -1)) = ?');
+    params.push(filetype.toLowerCase());
+  }
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ');
   }
   if (sort === 'latest') {
-    submissions = submissions.sort((a, b) => new Date(b.time) - new Date(a.time));
+    sql += ' ORDER BY time DESC';
   } else if (sort === 'oldest') {
-    submissions = submissions.sort((a, b) => new Date(a.time) - new Date(b.time));
+    sql += ' ORDER BY time ASC';
   }
-  res.json(submissions);
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Error fetching submissions:', err);
+      return res.status(500).json({ error: 'Failed to fetch submissions.' });
+    }
+    res.json(results);
+  });
 });
 
-app.get('/api/download/:filename', (req, res) => {
+app.get('/api/download/:filename', requireAuth, (req, res) => {
   const file = path.join(uploadsDir, req.params.filename);
   if (fs.existsSync(file)) res.download(file);
   else res.status(404).send('File not found');
 });
 
-app.delete('/api/delete-file/:filename', (req, res) => {
+app.delete('/api/delete-file/:filename', requireAuth, (req, res) => {
   const { filename } = req.params;
   const file = path.join(uploadsDir, filename);
-  let submissions = JSON.parse(fs.readFileSync(submissionsFile));
   if (!fs.existsSync(file)) return res.status(404).json({ error: 'File not found' });
   fs.unlinkSync(file);
-  submissions = submissions.filter(sub => sub.filename !== filename);
-  fs.writeFileSync(submissionsFile, JSON.stringify(submissions, null, 2));
-  res.json({ success: true });
+  // Remove the submission from MySQL
+  db.query('DELETE FROM submissions WHERE filename = ?', [filename], (err, result) => {
+    if (err) {
+      console.error('Error deleting submission from MySQL:', err);
+      return res.status(500).json({ error: 'Failed to delete submission from database.' });
+    }
+    res.json({ success: true });
+  });
 });
 
-app.get('/api/download-all', (req, res) => {
+app.get('/api/download-all', requireAuth, (req, res) => {
   const archive = archiver('zip', { zlib: { level: 9 } });
   res.attachment('all_submissions.zip');
   archive.pipe(res);
@@ -115,31 +178,147 @@ app.get('/api/download-all', (req, res) => {
   archive.finalize();
 });
 
-app.get('/api/deadline', (req, res) => {
-  const deadline = JSON.parse(fs.readFileSync(deadlineFile));
-  res.json({ deadline });
+app.get('/api/deadline', requireAuth, (req, res) => {
+  db.query('SELECT deadline FROM deadlines ORDER BY id DESC LIMIT 1', (err, results) => {
+    if (err) {
+      console.error('Error fetching deadline from MySQL:', err);
+      return res.status(500).json({ error: 'Failed to fetch deadline.' });
+    }
+    const deadline = results.length > 0 ? results[0].deadline : null;
+    res.json({ deadline });
+  });
 });
 
-app.post('/api/deadline', (req, res) => {
+app.post('/api/deadline', requireAuth, (req, res) => {
   const { deadline } = req.body;
   if (!deadline) return res.status(400).json({ error: 'Deadline required.' });
-  fs.writeFileSync(deadlineFile, JSON.stringify(deadline));
-  res.json({ success: true });
+  db.query('INSERT INTO deadlines (deadline) VALUES (?)', [deadline], (err, result) => {
+    if (err) {
+      console.error('Error saving deadline to MySQL:', err);
+      return res.status(500).json({ error: 'Failed to save deadline.' });
+    }
+    res.json({ success: true });
+  });
 });
 
-app.get('/api/analytics', (req, res) => {
-  const submissions = JSON.parse(fs.readFileSync(submissionsFile));
-  const users = new Set(submissions.map(sub => sub.name));
-  const totalFiles = submissions.length;
-  let mostRecent = null;
-  if (submissions.length > 0) {
-    mostRecent = submissions.reduce((a, b) => new Date(a.time) > new Date(b.time) ? a : b);
-  }
-  res.json({
-    totalUsers: users.size,
-    totalFiles,
-    mostRecent
+app.get('/api/analytics', requireAuth, (req, res) => {
+  db.query('SELECT name, time FROM submissions', (err, results) => {
+    if (err) {
+      console.error('Error fetching analytics:', err);
+      return res.status(500).json({ error: 'Failed to fetch analytics.' });
+    }
+    const users = new Set(results.map(sub => sub.name));
+    const totalFiles = results.length;
+    let mostRecent = null;
+    if (results.length > 0) {
+      mostRecent = results.reduce((a, b) => new Date(a.time) > new Date(b.time) ? a : b);
+    }
+    res.json({
+      totalUsers: users.size,
+      totalFiles,
+      mostRecent
+    });
   });
+});
+
+// User/Admin Sign Up with validation
+app.post('/api/signup', authLimiter, [
+  body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters.'),
+  body('email').isEmail().withMessage('Invalid email.'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
+  body('role').isIn(['User', 'Admin'])
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg });
+  }
+  const { username, email, password, role } = req.body;
+  if (!username || !email || !password || !role) {
+    return res.status(400).json({ error: 'All fields are required.' });
+  }
+  if (!['User', 'Admin'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role.' });
+  }
+  // Check for unique username
+  db.query('SELECT id FROM users WHERE username = ?', [username], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Database error.' });
+    if (results.length > 0) {
+      return res.status(400).json({ error: 'Username already exists.' });
+    }
+    // Check for unique email+role
+    db.query('SELECT id FROM users WHERE email = ? AND role = ?', [email, role], (err, results) => {
+      if (err) return res.status(500).json({ error: 'Database error.' });
+      if (results.length > 0) {
+        return res.status(400).json({ error: 'Email already registered for this role.' });
+      }
+      // Check for same email+password in other role
+      db.query('SELECT password FROM users WHERE email = ? AND role != ?', [email, role], async (err, results) => {
+        if (err) return res.status(500).json({ error: 'Database error.' });
+        for (const user of results) {
+          if (await bcrypt.compare(password, user.password)) {
+            return res.status(400).json({ error: 'This email and password combination is already used for another role.' });
+          }
+        }
+        // Hash password and insert
+        const hashedPassword = await bcrypt.hash(password, 10);
+        db.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, hashedPassword, role], (err, result) => {
+          if (err) return res.status(500).json({ error: 'Database error.' });
+          res.json({ success: true });
+        });
+      });
+    });
+  });
+});
+
+// User/Admin Login with validation and JWT
+app.post('/api/login', authLimiter, [
+  body('email').isEmail().withMessage('Invalid email.'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
+  body('role').isIn(['User', 'Admin'])
+], (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg });
+  }
+  const { email, password, role } = req.body;
+  db.query('SELECT * FROM users WHERE email = ? AND role = ?', [email, role], async (err, results) => {
+    if (err) return res.status(500).json({ error: 'Database error.' });
+    if (results.length === 0) {
+      return res.status(401).json({ error: 'Invalid login – check your email, password, or role.' });
+    }
+    const user = results[0];
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid login – check your email, password, or role.' });
+    }
+    // Issue JWT
+    const token = jwt.sign({ id: user.id, username: user.username, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '2h' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+  });
+});
+
+// JWT middleware
+function requireAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid token.' });
+  }
+  try {
+    const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token.' });
+  }
+}
+
+// Serve React build static files (after all API routes)
+const clientBuildPath = path.resolve(__dirname, '../client/build');
+app.use(express.static(clientBuildPath));
+
+// Catch-all route to serve index.html for SPA (after all API routes)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
 app.listen(PORT, () => console.log(`Docky server running on port ${PORT}`));
