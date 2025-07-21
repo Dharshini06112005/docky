@@ -281,6 +281,17 @@ app.post('/api/login', authLimiter, [
     return res.status(400).json({ error: errors.array()[0].msg });
   }
   const { email, password, role } = req.body;
+
+  // Restrict admin login to fixed credentials
+  if (role === 'Admin') {
+    if (email !== 'admin@gmail.com' || password !== 'Admin$123') {
+      return res.status(403).json({ error: 'You are not authorized to access the admin panel.' });
+    }
+    // Optionally, you can return a hardcoded admin user object
+    const token = jwt.sign({ id: 0, username: 'admin', email, role }, JWT_SECRET, { expiresIn: '2h' });
+    return res.json({ success: true, token, user: { id: 0, username: 'admin', email, role } });
+  }
+
   db.query('SELECT * FROM users WHERE email = ? AND role = ?', [email, role], async (err, results) => {
     if (err) return res.status(500).json({ error: 'Database error.' });
     if (results.length === 0) {
