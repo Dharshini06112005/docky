@@ -325,13 +325,4 @@ function requireAuth(req, res, next) {
   }
 }
 
-// Serve React build static files (after all API routes)
-const clientBuildPath = path.resolve(__dirname, '../client/build');
-app.use(express.static(clientBuildPath));
-
-// Catch-all route to serve index.html for SPA (after all API routes)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientBuildPath, 'index.html'));
-});
-
 app.listen(PORT, () => console.log(`Docky server running on port ${PORT}`));
