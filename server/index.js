@@ -339,32 +339,15 @@ app.post('/api/login', authLimiter, [
 
 // JWT middleware
 function requireAuth(req, res, next) {
-  console.log('Headers:', req.headers);
   const auth = req.headers.authorization;
-  
-  if (!auth) {
-    console.log('No authorization header found');
-    return res.status(401).json({ error: 'Missing authorization header.' });
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid token.' });
   }
-  
-  if (!auth.startsWith('Bearer ')) {
-    console.log('Invalid authorization format:', auth);
-    return res.status(401).json({ error: 'Invalid token format. Use Bearer <token>' });
-  }
-  
-  const token = auth.split(' ')[1];
-  if (!token) {
-    console.log('No token found in authorization header');
-    return res.status(401).json({ error: 'Missing token.' });
-  }
-  
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('Token decoded successfully:', { id: decoded.id, role: decoded.role });
+    const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
     req.user = decoded;
     next();
-  } catch (error) {
-    console.log('Token verification failed:', error.message);
+  } catch {
     return res.status(401).json({ error: 'Invalid or expired token.' });
   }
 }

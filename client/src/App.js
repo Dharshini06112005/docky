@@ -135,6 +135,31 @@ function UserDashboard({ user, onLogout }) {
   const [submitting, setSubmitting] = useState(false);
   const [token] = useAuthToken();
 
+  // Download function with authentication
+  const handleDownload = async (filename, originalname) => {
+    try {
+      const response = await fetch(`${API_URL}/api/download/${filename}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalname;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Failed to download file');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download file');
+    }
+  };
+
   // Fetch deadline
   useEffect(() => {
     fetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } })
@@ -184,31 +209,6 @@ function UserDashboard({ user, onLogout }) {
       setMessage(err.error || 'Upload failed.');
     }
     setSubmitting(false);
-  };
-
-  // Download file handler
-  const handleDownload = async (filename, originalname) => {
-    try {
-      const res = await fetch(`${API_URL}/api/download/${filename}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = originalname;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        const error = await res.json();
-        setMessage(error.error || 'Download failed.');
-      }
-    } catch (error) {
-      setMessage('Download failed.');
-    }
   };
 
   // Delete file handler
@@ -289,6 +289,56 @@ function AdminDashboard({ onLogout }) {
   const [message, setMessage] = useState('');
   const [token] = useAuthToken();
 
+  // Download function with authentication
+  const handleDownload = async (filename, originalname) => {
+    try {
+      const response = await fetch(`${API_URL}/api/download/${filename}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalname;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Failed to download file');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download file');
+    }
+  };
+
+  // Download all files with authentication
+  const handleDownloadAll = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/download-all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'all_submissions.zip';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Failed to download all files');
+      }
+    } catch (error) {
+      console.error('Download all error:', error);
+      alert('Failed to download all files');
+    }
+  };
+
   // Fetch deadline, analytics, and submissions
   const fetchAll = () => {
     fetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()).then(data => setDeadline(data.deadline));
@@ -318,35 +368,7 @@ function AdminDashboard({ onLogout }) {
     }
   };
 
-  // Download single file
-  const handleDownloadFile = async (filename, originalname) => {
-    try {
-      const res = await fetch(`${API_URL}/api/download/${filename}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = originalname;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        const error = await res.json();
-        setMessage(error.error || 'Download failed.');
-      }
-    } catch (error) {
-      setMessage('Download failed.');
-    }
-  };
 
-  // Download all files
-  const handleDownloadAll = () => {
-    window.open(`${API_URL}/api/download-all`, '_blank');
-  };
 
   // File type options
   const fileTypes = [
@@ -409,7 +431,7 @@ function AdminDashboard({ onLogout }) {
               <td>{sub.email || '-'}</td>
               <td>
                 <button 
-                  onClick={() => handleDownloadFile(sub.filename, sub.originalname)}
+                  onClick={() => handleDownload(sub.filename, sub.originalname)}
                   style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
                 >
                   {sub.originalname}
