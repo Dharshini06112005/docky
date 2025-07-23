@@ -1,5 +1,5 @@
 // Service worker to handle caching and routing
-const CACHE_NAME = 'docky-v2';
+const CACHE_NAME = 'docky-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -36,8 +36,40 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle static assets
-  if (request.destination === 'script' || request.destination === 'style' || request.destination === 'image') {
+  // Handle JavaScript files specifically
+  if (request.destination === 'script') {
+    event.respondWith(
+      fetch(request, {
+        headers: {
+          'Accept': 'application/javascript, text/javascript, */*'
+        }
+      })
+      .then((response) => {
+        // Check if response is actually JavaScript
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          // If server returns HTML instead of JS, try to get from cache
+          return caches.match(request);
+        }
+        // Cache successful responses
+        if (response.ok) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // If network fails, try cache
+        return caches.match(request);
+      })
+    );
+    return;
+  }
+
+  // Handle CSS files
+  if (request.destination === 'style') {
     event.respondWith(
       fetch(request)
         .then((response) => {

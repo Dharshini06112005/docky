@@ -658,6 +658,7 @@ function App() {
             
             if (res.ok) {
               // If we can access protected endpoint, user is logged in
+              // Try to determine role from token or assume admin for now
               setUser({ role: 'Admin', username: 'admin' });
             }
           } else {
