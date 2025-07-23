@@ -164,13 +164,15 @@ function UserDashboard({ user, onLogout }) {
 
   // Fetch deadline and user's uploaded files
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchUserData = async () => {
       try {
         // Fetch deadline
         const deadlineRes = await fetch(`${API_URL}/api/deadline`, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
-        if (deadlineRes.ok) {
+        if (deadlineRes.ok && isMounted) {
           const deadlineData = await deadlineRes.json();
           setDeadline(deadlineData.deadline);
         }
@@ -179,7 +181,7 @@ function UserDashboard({ user, onLogout }) {
         const filesRes = await fetch(`${API_URL}/api/submissions?search=${encodeURIComponent(user.username)}`, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
-        if (filesRes.ok) {
+        if (filesRes.ok && isMounted) {
           const filesData = await filesRes.json();
           setUploadedFiles(filesData.filter(f => f.name === user.username));
         }
@@ -190,13 +192,21 @@ function UserDashboard({ user, onLogout }) {
     };
 
     if (user && user.username && token) {
-      fetchUserData();
+      // Add a small delay to prevent rapid API calls
+      const timeoutId = setTimeout(fetchUserData, 100);
+      return () => {
+        isMounted = false;
+        clearTimeout(timeoutId);
+      };
     }
     
     // Timer to update 'now' every minute
     const timer = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(timer);
-  }, [user, token]);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [user?.username, token]); // Only depend on username and token, not entire user object
 
   // File selection handler
   const handleFileChange = (e) => {
@@ -247,8 +257,16 @@ function UserDashboard({ user, onLogout }) {
     }
   };
 
-  // Deadline display
-  const deadlineDisplay = deadline ? new Date(deadline).toLocaleString() : 'No deadline set';
+  // Deadline display with proper timezone handling
+  const deadlineDisplay = deadline ? 
+    new Date(deadline).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }) : 'No deadline set';
   const isAfterDeadline = deadline && new Date(now) > new Date(deadline);
 
   return (
@@ -691,11 +709,11 @@ function App() {
             }
           }
 
-          // Then try to validate token in background
+          // Then try to validate token in background (only once)
           try {
             let res = await fetch(`${API_URL}/api/health`, { 
               headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(3000) // Reduced timeout
+              signal: AbortSignal.timeout(5000) // Increased timeout
             });
             
             if (res.ok) {
@@ -703,7 +721,7 @@ function App() {
               try {
                 res = await fetch(`${API_URL}/api/analytics`, { 
                   headers: { Authorization: `Bearer ${token}` },
-                  signal: AbortSignal.timeout(2000)
+                  signal: AbortSignal.timeout(3000)
                 });
                 
                 if (res.ok) {
