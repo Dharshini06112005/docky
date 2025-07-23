@@ -26,9 +26,11 @@ const pool = new Pool({
   }
 });
 
+// Test database connection
 pool.connect((err) => {
   if (err) {
     console.error('Error connecting to PostgreSQL:', err);
+    console.error('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
     return;
   }
   console.log('Connected to PostgreSQL database!');
@@ -93,9 +95,12 @@ const uploadMulti = multer({
 
 // Protect sensitive routes with JWT middleware
 app.post('/api/submit', requireAuth, uploadMulti.array('documents', 10), async (req, res) => {
-  const { name, email } = req.body;
-  // Fetch the current deadline from the database
-  pool.query('SELECT deadline FROM deadlines ORDER BY id DESC LIMIT 1', (err, results) => {
+  try {
+    const { name, email } = req.body;
+    console.log('Received submission request:', { name, email, filesCount: req.files?.length });
+    
+    // Fetch the current deadline from the database
+    pool.query('SELECT deadline FROM deadlines ORDER BY id DESC LIMIT 1', (err, results) => {
     if (err) {
       console.error('Error fetching deadline from PostgreSQL:', err);
       return res.status(500).json({ error: 'Failed to fetch deadline.' });
@@ -116,8 +121,16 @@ app.post('/api/submit', requireAuth, uploadMulti.array('documents', 10), async (
       new Date()
     ]);
 
-    const sql = 'INSERT INTO submissions (name, email, filename, originalname, time) VALUES ?';
-    pool.query(sql, [entries], (err, result) => {
+    // Use PostgreSQL syntax for multiple inserts
+    const values = entries.map((entry, index) => {
+      const offset = index * 5;
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`;
+    }).join(', ');
+    
+    const sql = `INSERT INTO submissions (name, email, filename, originalname, time) VALUES ${values}`;
+    const flatParams = entries.flat();
+    
+    pool.query(sql, flatParams, (err, result) => {
       if (err) {
         console.error('Error inserting submissions:', err);
         return res.status(500).json({ error: 'Failed to save submissions.' });
@@ -125,6 +138,10 @@ app.post('/api/submit', requireAuth, uploadMulti.array('documents', 10), async (
       res.json({ success: true, files: entries.map(e => ({ filename: e[2], originalname: e[3] })) });
     });
   });
+  } catch (error) {
+    console.error('Error in /api/submit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/submissions', requireAuth, (req, res) => {
