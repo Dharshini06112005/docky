@@ -60,9 +60,18 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => {
+      .catch((error) => {
+        console.log('Script fetch failed:', request.url, error);
         // If network fails, try cache
-        return caches.match(request);
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // If no cached version, return a simple error response
+          return new Response('console.error("Script failed to load");', {
+            headers: { 'Content-Type': 'application/javascript' }
+          });
+        });
       })
     );
     return;

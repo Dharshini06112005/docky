@@ -4,7 +4,11 @@
   
   // Check if main app loaded
   setTimeout(function() {
-    if (!window.React || !document.getElementById('root').children.length) {
+    const root = document.getElementById('root');
+    const hasReactApp = window.React && root.children.length > 0 && 
+                       root.children[0].id !== 'fallback';
+    
+    if (!hasReactApp) {
       console.log('Main app failed to load, showing fallback');
       showFallback();
     }
