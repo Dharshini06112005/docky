@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -11,8 +11,8 @@ function RoleSelection() {
       <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
       <h2>Choose your role</h2>
       <div className="button-row">
-        <button onClick={() => navigate('/signup/User')}>User</button>
-        <button onClick={() => navigate('/login/Admin')}>Admin</button>
+        <button onClick={() => navigate('/#/signup/User')}>User</button>
+        <button onClick={() => navigate('/#/login/Admin')}>Admin</button>
       </div>
     </div>
   );
@@ -43,7 +43,7 @@ function SignUp() {
     const data = await res.json();
     if (res.ok) {
       setSuccess('Sign up successful! Please log in.');
-      setTimeout(() => navigate(`/login/${role}`), 1200);
+      setTimeout(() => navigate(`/#/login/${role}`), 1200);
     } else {
       setError(data.error || 'Sign up failed.');
     }
@@ -61,7 +61,7 @@ function SignUp() {
       {error && <div style={{ color: 'red', marginTop: 10 }}>{error}</div>}
       {success && <div style={{ color: 'green', marginTop: 10 }}>{success}</div>}
       <div style={{ marginTop: 10 }}>
-        Already have an account? <button onClick={() => navigate(`/login/${role}`)}>Log In</button>
+        Already have an account? <button onClick={() => navigate(`/#/login/${role}`)}>Log In</button>
       </div>
     </div>
   );
@@ -97,8 +97,8 @@ function Login({ onLogin }) {
     if (res.ok) {
       saveToken(data.token);
       onLogin(data.user);
-      if (role === 'User') navigate('/user-dashboard');
-      else navigate('/admin-dashboard');
+      if (role === 'User') navigate('/#/user-dashboard');
+      else navigate('/#/admin-dashboard');
     } else {
       if (role === 'Admin' && data.error === 'You are not authorized to access the admin panel.') {
         setError('Invalid admin credentials.');
@@ -550,7 +550,7 @@ function NotFound() {
       <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
       <h2>Page Not Found</h2>
       <p>The page you're looking for doesn't exist.</p>
-      <button onClick={() => window.location.href = '/'}>Go Home</button>
+      <button onClick={() => window.location.href = '/#/'}>Go Home</button>
     </div>
   );
 }
@@ -560,7 +560,7 @@ function AppRoutes({ user, setUser, saveToken }) {
   const handleLogout = () => {
     setUser(null);
     saveToken('');
-    navigate('/');
+    navigate('/#/');
   };
   return (
     <Routes>
@@ -610,7 +610,7 @@ class ErrorBoundary extends React.Component {
           <h2>Something went wrong</h2>
           <p>Please refresh the page or go back to the home page.</p>
           <button onClick={() => window.location.reload()}>Refresh Page</button>
-          <button onClick={() => window.location.href = '/'} style={{ marginLeft: 10 }}>Go Home</button>
+          <button onClick={() => window.location.href = '/#/'} style={{ marginLeft: 10 }}>Go Home</button>
         </div>
       );
     }

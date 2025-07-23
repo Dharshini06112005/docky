@@ -1,9 +1,9 @@
-// Simple service worker to handle caching
-const CACHE_NAME = 'docky-v1';
+// Service worker to handle caching and routing
+const CACHE_NAME = 'docky-v2';
 const urlsToCache = [
   '/',
-  '/static/js/main.js',
-  '/static/css/main.css'
+  '/index.html',
+  '/404.html'
 ];
 
 self.addEventListener('install', (event) => {
@@ -14,18 +14,49 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  
+  // Handle navigation requests (HTML pages)
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // If the response is successful, return it
+          if (response.status === 200) {
+            return response;
+          }
+          // If it's a 404, return the index.html
+          return fetch('/index.html');
+        })
+        .catch(() => {
+          // If network fails, return cached index.html
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // Handle static assets
+  if (request.destination === 'script' || request.destination === 'style' || request.destination === 'image') {
+    event.respondWith(
+      caches.match(request)
+        .then((response) => {
+          // Return cached version or fetch from network
+          return response || fetch(request);
+        })
+        .catch(() => {
+          // If both cache and network fail, return empty response
+          return new Response('', { status: 404 });
+        })
+    );
+    return;
+  }
+
+  // For all other requests, try network first
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
-      })
+    fetch(request)
       .catch(() => {
-        // If both cache and network fail, return a fallback
-        if (event.request.destination === 'document') {
-          return caches.match('/404.html');
-        }
-        return new Response('', { status: 404 });
+        return caches.match(request);
       })
   );
 });
