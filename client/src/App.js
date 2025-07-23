@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 import './App.css';
 
@@ -287,6 +287,7 @@ function AdminDashboard({ onLogout }) {
   const [filetype, setFiletype] = useState('');
   const [sort, setSort] = useState('latest');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const [token] = useAuthToken();
 
   // Download function with authentication
@@ -340,31 +341,56 @@ function AdminDashboard({ onLogout }) {
   };
 
   // Fetch deadline, analytics, and submissions
-  const fetchAll = () => {
-    fetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()).then(data => setDeadline(data.deadline));
-    fetch(`${API_URL}/api/analytics`, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()).then(setAnalytics);
-    let url = `${API_URL}/api/submissions?sort=${sort}`;
-    if (search) url += `&search=${encodeURIComponent(search)}`;
-    if (filetype) url += `&filetype=${encodeURIComponent(filetype)}`;
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()).then(setSubmissions);
-  };
+  const fetchAll = useCallback(() => {
+    setLoading(true);
+    
+    Promise.all([
+      fetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.json())
+        .then(data => setDeadline(data.deadline))
+        .catch(err => console.error('Error fetching deadline:', err)),
+      
+      fetch(`${API_URL}/api/analytics`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.json())
+        .then(setAnalytics)
+        .catch(err => console.error('Error fetching analytics:', err)),
+      
+      fetch(`${API_URL}/api/submissions?sort=${sort}${search ? `&search=${encodeURIComponent(search)}` : ''}${filetype ? `&filetype=${encodeURIComponent(filetype)}` : ''}`, 
+        { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.json())
+        .then(setSubmissions)
+        .catch(err => console.error('Error fetching submissions:', err))
+    ]).finally(() => setLoading(false));
+  }, [search, filetype, sort, token]);
 
-  useEffect(() => { fetchAll(); }, [search, filetype, sort, token, fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // Set new deadline
   const handleSetDeadline = async (e) => {
     e.preventDefault();
     if (!newDeadline) return;
-    const res = await fetch(`${API_URL}/api/deadline`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ deadline: newDeadline })
-    });
-    if (res.ok) {
-      setDeadline(newDeadline);
-      setMessage('Deadline updated!');
-    } else {
-      setMessage('Failed to set deadline.');
+    
+    // Convert to ISO string for proper format
+    const deadlineDate = new Date(newDeadline);
+    const isoDeadline = deadlineDate.toISOString();
+    
+    try {
+      const res = await fetch(`${API_URL}/api/deadline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ deadline: isoDeadline })
+      });
+      if (res.ok) {
+        setDeadline(isoDeadline);
+        setNewDeadline('');
+        setMessage('Deadline updated successfully!');
+      } else {
+        const errorData = await res.json();
+        setMessage(`Failed to set deadline: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error setting deadline:', error);
+      setMessage('Failed to set deadline. Please try again.');
     }
   };
 
@@ -391,6 +417,13 @@ function AdminDashboard({ onLogout }) {
         />
         <button type="submit">Set Deadline</button>
         <span style={{ marginLeft: 16 }}>Current: <b>{deadline ? new Date(deadline).toLocaleString() : 'None'}</b></span>
+        {deadline && (
+          <div style={{ marginTop: 8, fontSize: '0.9em', color: '#666' }}>
+            Time remaining: {new Date(deadline) > new Date() ? 
+              `${Math.floor((new Date(deadline) - new Date()) / (1000 * 60 * 60))} hours` : 
+              'Deadline has passed'}
+          </div>
+        )}
       </form>
       {analytics && (
         <div style={{ marginBottom: 16 }}>
@@ -412,9 +445,17 @@ function AdminDashboard({ onLogout }) {
           <option value="latest">Latest</option>
           <option value="oldest">Oldest</option>
         </select>
-        <button type="button" onClick={handleDownloadAll} style={{ marginLeft: 16 }}>Download All Files</button>
+        <button 
+          type="button" 
+          onClick={handleDownloadAll} 
+          style={{ marginLeft: 16 }}
+          disabled={loading}
+        >
+          {loading ? 'Loading...' : 'Download All Files'}
+        </button>
       </div>
       {message && <div style={{ color: 'green', marginBottom: 8 }}>{message}</div>}
+      {loading && <div style={{ color: 'blue', marginBottom: 8 }}>Loading data...</div>}
       <table>
         <thead>
           <tr>
