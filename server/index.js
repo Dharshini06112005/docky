@@ -49,13 +49,18 @@ const authLimiter = rateLimit({
 // Allow cross-origin requests
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://docky-frontend.onrender.com', 'http://localhost:3000']
+    ? ['https://docky-frontend-blz5.onrender.com', 'https://docky-frontend.onrender.com', 'http://localhost:3000']
     : 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Body parser middleware
 app.use(express.json());
+
+// Handle preflight requests
+app.options('*', cors());
 
 const uploadsDir = path.resolve('./uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
