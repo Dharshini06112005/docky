@@ -1,1 +1,80 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="Docky - Document submission platform"/><link rel="apple-touch-icon" href="/logo192.png"/><link rel="manifest" href="/manifest.json"/><title>Docky</title><script defer="defer" src="/static/js/main.4d9464f2.js"></script><link href="/static/css/main.e7053fab.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <link rel="icon" href="/favicon.ico"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="theme-color" content="#000000"/>
+    <meta name="description" content="Docky - Document submission platform"/>
+    <link rel="apple-touch-icon" href="/logo192.png"/>
+    <link rel="manifest" href="/manifest.json"/>
+    <title>Docky</title>
+    <script defer="defer" src="/static/js/main.8e0f715b.js"></script>
+    <link href="/static/css/main.e7053fab.css" rel="stylesheet"/>
+    <style>
+        /* Fallback styles in case CSS fails to load */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fallback {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+        }
+        .fallback h1 {
+            color: #805ad5;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            letter-spacing: 2px;
+        }
+        .fallback button {
+            background: #805ad5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .fallback button:hover {
+            background: #6b46c1;
+        }
+    </style>
+</head>
+<body>
+    <noscript>
+        <div class="fallback">
+            <h1>Docky</h1>
+            <p>You need to enable JavaScript to run this app.</p>
+        </div>
+    </noscript>
+    <div id="root">
+        <!-- Fallback content if React fails to load -->
+        <div class="fallback" id="fallback" style="display: none;">
+            <h1>Docky</h1>
+            <p>Loading application...</p>
+            <button onclick="window.location.reload()">Refresh Page</button>
+        </div>
+    </div>
+    <script>
+        // Show fallback if React doesn't load within 5 seconds
+        setTimeout(() => {
+            if (!document.getElementById('root').children.length || 
+                document.getElementById('root').children[0].id === 'fallback') {
+                document.getElementById('fallback').style.display = 'block';
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

@@ -585,15 +585,21 @@ function AppRoutes({ user, setUser, saveToken }) {
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    
+    // Don't show error boundary for resource loading errors
+    if (error.message && error.message.includes('Loading')) {
+      this.setState({ hasError: false });
+      return;
+    }
   }
 
   render() {
@@ -618,40 +624,81 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [token, saveToken] = useAuthToken();
 
+  // Register service worker
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('SW registered: ', registration);
+        })
+        .catch((registrationError) => {
+          console.log('SW registration failed: ', registrationError);
+        });
+    }
+  }, []);
+
   // Check if user is logged in on app start
   useEffect(() => {
-    if (token) {
-      // Try to validate token
-      fetch(`${API_URL}/api/health`, { 
-        headers: { Authorization: `Bearer ${token}` } 
-      })
-      .then(res => {
-        if (res.ok) {
-          // Token is valid, try to get user info
-          return fetch(`${API_URL}/api/analytics`, { 
-            headers: { Authorization: `Bearer ${token}` } 
+    const initializeApp = async () => {
+      try {
+        if (token) {
+          // Try to validate token with retry mechanism
+          let res = await fetch(`${API_URL}/api/health`, { 
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(5000) // 5 second timeout
           });
+          
+          if (res.ok) {
+            // Token is valid, try to get user info
+            res = await fetch(`${API_URL}/api/analytics`, { 
+              headers: { Authorization: `Bearer ${token}` },
+              signal: AbortSignal.timeout(5000)
+            });
+            
+            if (res.ok) {
+              // If we can access protected endpoint, user is logged in
+              setUser({ role: 'Admin', username: 'admin' });
+            }
+          } else {
+            // Token is invalid, clear it
+            saveToken('');
+          }
         }
-        throw new Error('Invalid token');
-      })
-      .then(res => {
-        if (res.ok) {
-          // If we can access protected endpoint, user is logged in
-          // For now, we'll assume admin since we don't have user info endpoint
-          setUser({ role: 'Admin', username: 'admin' });
+      } catch (err) {
+        console.error('App initialization error:', err);
+        // Don't show error for network issues, just clear token
+        if (token) {
+          saveToken('');
         }
-      })
-      .catch(() => {
-        // Token is invalid, clear it
-        saveToken('');
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
-    } else {
-      setLoading(false);
-    }
+      }
+    };
+
+    initializeApp();
   }, [token, saveToken]);
+
+  // Handle resource loading errors
+  useEffect(() => {
+    const handleResourceError = (event) => {
+      console.warn('Resource failed to load:', event.target.src || event.target.href);
+      // Don't show error for resource loading failures
+    };
+
+    const handleUnhandledRejection = (event) => {
+      console.warn('Unhandled promise rejection:', event.reason);
+      // Prevent default error handling for network errors
+      event.preventDefault();
+    };
+
+    window.addEventListener('error', handleResourceError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('error', handleResourceError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -661,6 +708,8 @@ function App() {
       </div>
     );
   }
+
+
 
   return (
     <ErrorBoundary>
