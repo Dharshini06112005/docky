@@ -1,57 +1,39 @@
-// Service worker to handle caching and routing
-const CACHE_NAME = 'docky-v3';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/404.html'
-];
+// Simple service worker for Docky
+const CACHE_NAME = 'docky-v4';
 
 self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+      .then((cache) => {
+        console.log('Service Worker installed');
+        return cache.addAll([
+          '/',
+          '/index.html',
+          '/404.html'
+        ]);
+      })
   );
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   
-  // Handle navigation requests (HTML pages)
+  // For navigation requests, always return index.html
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // If the response is successful, return it
-          if (response.status === 200) {
-            return response;
-          }
-          // If it's a 404, return the index.html
-          return fetch('/index.html');
-        })
-        .catch(() => {
-          // If network fails, return cached index.html
-          return caches.match('/index.html');
-        })
+      fetch('/index.html').catch(() => {
+        return caches.match('/index.html');
+      })
     );
     return;
   }
 
-  // Handle JavaScript files specifically
-  if (request.destination === 'script') {
-    event.respondWith(
-      fetch(request, {
-        headers: {
-          'Accept': 'application/javascript, text/javascript, */*'
-        }
-      })
+  // For all other requests, try network first, then cache
+  event.respondWith(
+    fetch(request)
       .then((response) => {
-        // Check if response is actually JavaScript
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html')) {
-          // If server returns HTML instead of JS, try to get from cache
-          return caches.match(request);
-        }
-        // Cache successful responses
+        // Only cache successful responses
         if (response.ok) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -61,63 +43,27 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch((error) => {
-        console.log('Script fetch failed:', request.url, error);
-        // If network fails, try cache
-        return caches.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // If no cached version, return a simple error response
-          return new Response('console.error("Script failed to load");', {
-            headers: { 'Content-Type': 'application/javascript' }
-          });
-        });
-      })
-    );
-    return;
-  }
-
-  // Handle CSS files
-  if (request.destination === 'style') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful responses
-          if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // If network fails, try cache
-          return caches.match(request);
-        })
-    );
-    return;
-  }
-
-  // For all other requests, try network first
-  event.respondWith(
-    fetch(request)
-      .catch(() => {
+        console.log('Fetch failed for:', request.url, error);
+        // Try to get from cache
         return caches.match(request);
       })
   );
 });
 
 self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('Service Worker activated');
     })
   );
 }); 

@@ -12,7 +12,7 @@
       console.log('Main app failed to load, showing fallback');
       showFallback();
     }
-  }, 3000);
+  }, 8000); // Increased timeout to 8 seconds
   
   function showFallback() {
     const root = document.getElementById('root');

@@ -70,13 +70,13 @@
         </div>
     </div>
     <script>
-        // Show fallback if React doesn't load within 5 seconds
+        // Show fallback if React doesn't load within 8 seconds
         setTimeout(() => {
             if (!document.getElementById('root').children.length || 
                 document.getElementById('root').children[0].id === 'fallback') {
                 document.getElementById('fallback').style.display = 'block';
             }
-        }, 5000);
+        }, 8000);
     </script>
 </body>
 </html>
