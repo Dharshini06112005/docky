@@ -9,9 +9,10 @@
     <link rel="apple-touch-icon" href="/logo192.png"/>
     <link rel="manifest" href="/manifest.json"/>
     <title>Docky</title>
-    <script defer="defer" src="/static/js/main.fbfd6c0b.js"></script>
+    <script defer="defer" src="/static/js/main.95a5e664.js"></script>
     <link href="/static/css/main.e7053fab.css" rel="stylesheet"/>
-    <script src="/fallback.js"></script>
+    <!-- Temporarily disabled fallback script to fix loading issues -->
+    <!-- <script src="/fallback.js"></script> -->
     <style>
         /* Fallback styles in case CSS fails to load */
         body {
@@ -61,22 +62,7 @@
         </div>
     </noscript>
     <div id="root">
-        <!-- Fallback content if React fails to load -->
-        <div class="fallback" id="fallback" style="display: none;">
-            <h1>Docky</h1>
-            <p>Loading application...</p>
-            <button onclick="window.location.href='/'">Go Home</button>
-        <button onclick="window.location.reload()">Refresh Page</button>
-        </div>
+        <!-- React app will be rendered here -->
     </div>
-    <script>
-        // Show fallback if React doesn't load within 8 seconds
-        setTimeout(() => {
-            if (!document.getElementById('root').children.length || 
-                document.getElementById('root').children[0].id === 'fallback') {
-                document.getElementById('fallback').style.display = 'block';
-            }
-        }, 8000);
-    </script>
 </body>
 </html>

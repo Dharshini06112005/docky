@@ -660,17 +660,16 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [token, saveToken] = useAuthToken();
 
-  // Register service worker
+  // Temporarily disable service worker to fix loading issues
   useEffect(() => {
+    // Unregister any existing service workers
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('SW registered: ', registration);
-        })
-        .catch((registrationError) => {
-          console.log('SW registration failed: ', registrationError);
-          // Don't show error to user, just log it
-        });
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('Service worker unregistered');
+        }
+      });
     }
   }, []);
 
