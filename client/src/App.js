@@ -544,6 +544,17 @@ function ProtectedRoute({ user, children }) {
   return children;
 }
 
+function NotFound() {
+  return (
+    <div className="centered-card">
+      <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
+      <h2>Page Not Found</h2>
+      <p>The page you're looking for doesn't exist.</p>
+      <button onClick={() => window.location.href = '/'}>Go Home</button>
+    </div>
+  );
+}
+
 function AppRoutes({ user, setUser, saveToken }) {
   const navigate = useNavigate();
   const handleLogout = () => {
@@ -566,18 +577,97 @@ function AppRoutes({ user, setUser, saveToken }) {
           <AdminDashboard onLogout={handleLogout} />
         </ProtectedRoute>
       } />
-      <Route path="*" element={<RoleSelection />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="centered-card">
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
+          <h2>Something went wrong</h2>
+          <p>Please refresh the page or go back to the home page.</p>
+          <button onClick={() => window.location.reload()}>Refresh Page</button>
+          <button onClick={() => window.location.href = '/'} style={{ marginLeft: 10 }}>Go Home</button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [token, saveToken] = useAuthToken();
+
+  // Check if user is logged in on app start
+  useEffect(() => {
+    if (token) {
+      // Try to validate token
+      fetch(`${API_URL}/api/health`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      })
+      .then(res => {
+        if (res.ok) {
+          // Token is valid, try to get user info
+          return fetch(`${API_URL}/api/analytics`, { 
+            headers: { Authorization: `Bearer ${token}` } 
+          });
+        }
+        throw new Error('Invalid token');
+      })
+      .then(res => {
+        if (res.ok) {
+          // If we can access protected endpoint, user is logged in
+          // For now, we'll assume admin since we don't have user info endpoint
+          setUser({ role: 'Admin', username: 'admin' });
+        }
+      })
+      .catch(() => {
+        // Token is invalid, clear it
+        saveToken('');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, [token, saveToken]);
+
+  if (loading) {
+    return (
+      <div className="centered-card">
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <Router>
-      <AppRoutes user={user} setUser={setUser} saveToken={saveToken} />
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AppRoutes user={user} setUser={setUser} saveToken={saveToken} />
+      </Router>
+    </ErrorBoundary>
   );
 }
 
