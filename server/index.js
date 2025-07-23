@@ -49,7 +49,7 @@ const authLimiter = rateLimit({
 // Allow cross-origin requests
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-frontend-app.onrender.com', 'http://localhost:3000']
+    ? ['https://docky-frontend.onrender.com', 'http://localhost:3000']
     : 'http://localhost:3000',
   credentials: true
 }));
