@@ -31,9 +31,11 @@ pool.connect((err) => {
   if (err) {
     console.error('Error connecting to PostgreSQL:', err);
     console.error('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+    console.error('NODE_ENV:', process.env.NODE_ENV);
     return;
   }
   console.log('Connected to PostgreSQL database!');
+  console.log('Database URL:', process.env.DATABASE_URL ? 'Configured' : 'Not configured');
 });
 
 const app = express();
@@ -155,8 +157,9 @@ app.get('/api/submissions', requireAuth, (req, res) => {
     params.push(`%${search.toLowerCase()}%`);
   }
   if (filetype && filetype.toLowerCase() !== 'all') {
-    conditions.push('LOWER(SUBSTRING(originalname from \'\\.(\\w+)$)\') = $' + (params.length + 1));
-    params.push(filetype.toLowerCase());
+    // Use a simpler approach for file extension filtering
+    conditions.push('LOWER(originalname) LIKE $' + (params.length + 1));
+    params.push(`%.${filetype.toLowerCase()}`);
   }
   if (conditions.length > 0) {
     sql += ' WHERE ' + conditions.join(' AND ');
@@ -167,11 +170,15 @@ app.get('/api/submissions', requireAuth, (req, res) => {
     sql += ' ORDER BY time ASC';
   }
 
+  console.log('SQL Query:', sql);
+  console.log('Parameters:', params);
+
   pool.query(sql, params, (err, results) => {
     if (err) {
       console.error('Error fetching submissions:', err);
       return res.status(500).json({ error: 'Failed to fetch submissions.' });
     }
+    console.log('Query results:', results.rows.length, 'rows');
     res.json(results.rows);
   });
 });
@@ -351,5 +358,14 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired token.' });
   }
 }
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: process.env.DATABASE_URL ? 'configured' : 'not configured'
+  });
+});
 
 app.listen(PORT, () => console.log(`Docky server running on port ${PORT}`));

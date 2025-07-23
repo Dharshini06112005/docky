@@ -510,21 +510,29 @@ function AdminDashboard({ onLogout }) {
           </tr>
         </thead>
         <tbody>
-          {submissions.map((sub, idx) => (
-            <tr key={idx}>
-              <td>{sub.name}</td>
-              <td>{sub.email || '-'}</td>
-              <td>
-                <button 
-                  onClick={() => handleDownload(sub.filename, sub.originalname)}
-                  style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
-                >
-                  {sub.originalname}
-                </button>
+          {submissions.length === 0 && !loading ? (
+            <tr>
+              <td colSpan="4" style={{ textAlign: 'center', color: '#666' }}>
+                {filetype ? `No ${filetype.toUpperCase()} files found` : 'No submissions found'}
               </td>
-              <td>{new Date(sub.time).toLocaleString()}</td>
             </tr>
-          ))}
+          ) : (
+            submissions.map((sub, idx) => (
+              <tr key={idx}>
+                <td>{sub.name}</td>
+                <td>{sub.email || '-'}</td>
+                <td>
+                  <button 
+                    onClick={() => handleDownload(sub.filename, sub.originalname)}
+                    style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                  >
+                    {sub.originalname}
+                  </button>
+                </td>
+                <td>{new Date(sub.time).toLocaleString()}</td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
