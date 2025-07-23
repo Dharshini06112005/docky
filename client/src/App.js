@@ -162,19 +162,41 @@ function UserDashboard({ user, onLogout }) {
     }
   };
 
-  // Fetch deadline
+  // Fetch deadline and user's uploaded files
   useEffect(() => {
-    fetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => setDeadline(data.deadline));
-    // Fetch user's uploaded files
-    fetch(`${API_URL}/api/submissions?search=${encodeURIComponent(user.username)}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => setUploadedFiles(data.filter(f => f.name === user.username)));
+    const fetchUserData = async () => {
+      try {
+        // Fetch deadline
+        const deadlineRes = await fetch(`${API_URL}/api/deadline`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        if (deadlineRes.ok) {
+          const deadlineData = await deadlineRes.json();
+          setDeadline(deadlineData.deadline);
+        }
+        
+        // Fetch user's uploaded files
+        const filesRes = await fetch(`${API_URL}/api/submissions?search=${encodeURIComponent(user.username)}`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        if (filesRes.ok) {
+          const filesData = await filesRes.json();
+          setUploadedFiles(filesData.filter(f => f.name === user.username));
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        // Don't show error to user, just log it
+      }
+    };
+
+    if (user && user.username && token) {
+      fetchUserData();
+    }
+    
     // Timer to update 'now' every minute
     const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
-  }, [user.username, token]);
+  }, [user, token]);
 
   // File selection handler
   const handleFileChange = (e) => {
@@ -547,7 +569,10 @@ function ProtectedRoute({ user, children }) {
     return (
       <div className="centered-card">
         <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
-        <p>Loading...</p>
+        <p>Loading user session...</p>
+        <p style={{ fontSize: '0.9em', color: '#666', marginTop: 10 }}>
+          If this takes too long, please refresh the page.
+        </p>
       </div>
     );
   }
@@ -654,70 +679,58 @@ function App() {
     const initializeApp = async () => {
       try {
         if (token) {
-          // Try to validate token with retry mechanism
-          let res = await fetch(`${API_URL}/api/health`, { 
-            headers: { Authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(5000) // 5 second timeout
-          });
-          
-          if (res.ok) {
-            // Token is valid, now try to determine user role
-            // Try admin endpoint first
+          // First, try to restore user from localStorage immediately
+          const storedUser = localStorage.getItem('user_info');
+          if (storedUser) {
             try {
-              res = await fetch(`${API_URL}/api/analytics`, { 
-                headers: { Authorization: `Bearer ${token}` },
-                signal: AbortSignal.timeout(3000)
-              });
-              
-              if (res.ok) {
-                // User can access admin endpoint, so they're an admin
-                setUser({ role: 'Admin', username: 'admin' });
-              } else {
-                // Try user endpoint to see if they're a regular user
-                res = await fetch(`${API_URL}/api/deadline`, { 
+              const userInfo = JSON.parse(storedUser);
+              // Set user immediately for better UX
+              setUser({ role: 'User', username: userInfo.username, email: userInfo.email });
+            } catch (parseError) {
+              console.error('Failed to parse stored user info:', parseError);
+              localStorage.removeItem('user_info');
+            }
+          }
+
+          // Then try to validate token in background
+          try {
+            let res = await fetch(`${API_URL}/api/health`, { 
+              headers: { Authorization: `Bearer ${token}` },
+              signal: AbortSignal.timeout(3000) // Reduced timeout
+            });
+            
+            if (res.ok) {
+              // Token is valid, try to determine user role
+              try {
+                res = await fetch(`${API_URL}/api/analytics`, { 
                   headers: { Authorization: `Bearer ${token}` },
-                  signal: AbortSignal.timeout(3000)
+                  signal: AbortSignal.timeout(2000)
                 });
                 
                 if (res.ok) {
-                  // User can access user endpoint, so they're a regular user
-                  // We need to get their username from localStorage or token
-                  const storedUser = localStorage.getItem('user_info');
-                  if (storedUser) {
-                    const userInfo = JSON.parse(storedUser);
-                    setUser({ role: 'User', username: userInfo.username, email: userInfo.email });
-                  } else {
-                    // Fallback to a default user
-                    setUser({ role: 'User', username: 'user', email: 'user@example.com' });
-                  }
+                  // User can access admin endpoint, so they're an admin
+                  setUser({ role: 'Admin', username: 'admin' });
+                } else {
+                  // User is not admin, keep them as regular user
+                  // User info is already set from localStorage above
                 }
+              } catch (endpointError) {
+                console.log('Admin endpoint check failed, keeping user as regular user');
+                // Keep user as regular user, don't change anything
               }
-                         } catch (endpointError) {
-               console.log('Endpoint check failed, trying to restore user from localStorage');
-               // If endpoint checks fail, try to restore user from localStorage
-               const storedUser = localStorage.getItem('user_info');
-               if (storedUser) {
-                 try {
-                   const userInfo = JSON.parse(storedUser);
-                   setUser({ role: 'User', username: userInfo.username, email: userInfo.email });
-                 } catch (parseError) {
-                   console.error('Failed to parse stored user info:', parseError);
-                   // Clear invalid stored data
-                   localStorage.removeItem('user_info');
-                 }
-               }
-             }
-          } else {
-            // Token is invalid, clear it
-            saveToken('');
+            } else {
+              // Token might be invalid, but don't clear it immediately
+              // Let the user try to use the app first
+              console.log('Token validation failed, but keeping user logged in');
+            }
+          } catch (networkError) {
+            console.log('Network error during token validation, keeping user logged in');
+            // Network error, keep user logged in
           }
         }
       } catch (err) {
         console.error('App initialization error:', err);
-        // Don't show error for network issues, just clear token
-        if (token) {
-          saveToken('');
-        }
+        // Don't clear token on general errors
       } finally {
         setLoading(false);
       }
@@ -752,7 +765,10 @@ function App() {
     return (
       <div className="centered-card">
         <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
-        <p>Loading...</p>
+        <p>Initializing application...</p>
+        <p style={{ fontSize: '0.9em', color: '#666', marginTop: 10 }}>
+          Please wait while we restore your session.
+        </p>
       </div>
     );
   }
