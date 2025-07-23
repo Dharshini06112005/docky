@@ -47,7 +47,12 @@ const authLimiter = rateLimit({
 });
 
 // Allow cross-origin requests
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-frontend-app.onrender.com', 'http://localhost:3000']
+    : 'http://localhost:3000',
+  credentials: true
+}));
 
 // Body parser middleware
 app.use(express.json());
