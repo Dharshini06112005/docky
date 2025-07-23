@@ -6,4 +6,4 @@ services:
     staticPublishPath: ./client/build
     envVars:
       - key: REACT_APP_API_URL
-        value: https://your-backend-render-url.onrender.com 
+        value: https://docky-server.onrender.com 
