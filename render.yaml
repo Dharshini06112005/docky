@@ -2,7 +2,7 @@ services:
   - type: web
     name: docky-frontend
     env: static
-    buildCommand: cd client && npm install && npm run build
+    buildCommand: npm run build
     staticPublishPath: ./client/build
     envVars:
       - key: REACT_APP_API_URL
