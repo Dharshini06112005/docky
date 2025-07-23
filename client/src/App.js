@@ -96,6 +96,8 @@ function Login({ onLogin }) {
     const data = await res.json();
     if (res.ok) {
       saveToken(data.token);
+      // Store user info in localStorage for persistence
+      localStorage.setItem('user_info', JSON.stringify(data.user));
       onLogin(data.user);
       if (role === 'User') navigate('/user-dashboard');
       else navigate('/admin-dashboard');
@@ -540,7 +542,15 @@ function AdminDashboard({ onLogout }) {
 }
 
 function ProtectedRoute({ user, children }) {
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) {
+    // Show loading while checking authentication
+    return (
+      <div className="centered-card">
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: '#805ad5', letterSpacing: '2px' }}>Docky</h1>
+        <p>Loading...</p>
+      </div>
+    );
+  }
   return children;
 }
 
@@ -560,6 +570,7 @@ function AppRoutes({ user, setUser, saveToken }) {
   const handleLogout = () => {
     setUser(null);
     saveToken('');
+    localStorage.removeItem('user_info');
     navigate('/');
   };
   return (
@@ -650,17 +661,52 @@ function App() {
           });
           
           if (res.ok) {
-            // Token is valid, try to get user info
-            res = await fetch(`${API_URL}/api/analytics`, { 
-              headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(5000)
-            });
-            
-            if (res.ok) {
-              // If we can access protected endpoint, user is logged in
-              // Try to determine role from token or assume admin for now
-              setUser({ role: 'Admin', username: 'admin' });
-            }
+            // Token is valid, now try to determine user role
+            // Try admin endpoint first
+            try {
+              res = await fetch(`${API_URL}/api/analytics`, { 
+                headers: { Authorization: `Bearer ${token}` },
+                signal: AbortSignal.timeout(3000)
+              });
+              
+              if (res.ok) {
+                // User can access admin endpoint, so they're an admin
+                setUser({ role: 'Admin', username: 'admin' });
+              } else {
+                // Try user endpoint to see if they're a regular user
+                res = await fetch(`${API_URL}/api/deadline`, { 
+                  headers: { Authorization: `Bearer ${token}` },
+                  signal: AbortSignal.timeout(3000)
+                });
+                
+                if (res.ok) {
+                  // User can access user endpoint, so they're a regular user
+                  // We need to get their username from localStorage or token
+                  const storedUser = localStorage.getItem('user_info');
+                  if (storedUser) {
+                    const userInfo = JSON.parse(storedUser);
+                    setUser({ role: 'User', username: userInfo.username, email: userInfo.email });
+                  } else {
+                    // Fallback to a default user
+                    setUser({ role: 'User', username: 'user', email: 'user@example.com' });
+                  }
+                }
+              }
+                         } catch (endpointError) {
+               console.log('Endpoint check failed, trying to restore user from localStorage');
+               // If endpoint checks fail, try to restore user from localStorage
+               const storedUser = localStorage.getItem('user_info');
+               if (storedUser) {
+                 try {
+                   const userInfo = JSON.parse(storedUser);
+                   setUser({ role: 'User', username: userInfo.username, email: userInfo.email });
+                 } catch (parseError) {
+                   console.error('Failed to parse stored user info:', parseError);
+                   // Clear invalid stored data
+                   localStorage.removeItem('user_info');
+                 }
+               }
+             }
           } else {
             // Token is invalid, clear it
             saveToken('');
