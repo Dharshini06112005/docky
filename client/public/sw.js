@@ -39,14 +39,20 @@ self.addEventListener('fetch', (event) => {
   // Handle static assets
   if (request.destination === 'script' || request.destination === 'style' || request.destination === 'image') {
     event.respondWith(
-      caches.match(request)
+      fetch(request)
         .then((response) => {
-          // Return cached version or fetch from network
-          return response || fetch(request);
+          // Cache successful responses
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
         })
         .catch(() => {
-          // If both cache and network fail, return empty response
-          return new Response('', { status: 404 });
+          // If network fails, try cache
+          return caches.match(request);
         })
     );
     return;
