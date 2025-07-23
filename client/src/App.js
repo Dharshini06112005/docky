@@ -186,6 +186,31 @@ function UserDashboard({ user, onLogout }) {
     setSubmitting(false);
   };
 
+  // Download file handler
+  const handleDownload = async (filename, originalname) => {
+    try {
+      const res = await fetch(`${API_URL}/api/download/${filename}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalname;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const error = await res.json();
+        setMessage(error.error || 'Download failed.');
+      }
+    } catch (error) {
+      setMessage('Download failed.');
+    }
+  };
+
   // Delete file handler
   const handleDelete = async (filename) => {
     if (!window.confirm('Delete this file?')) return;
@@ -236,7 +261,12 @@ function UserDashboard({ user, onLogout }) {
           <ul>
             {uploadedFiles.map(f => (
               <li key={f.filename} style={{ marginBottom: 8 }}>
-                <a href={`${API_URL}/api/download/${f.filename}`} target="_blank" rel="noopener noreferrer">{f.originalname}</a>
+                <button 
+                  onClick={() => handleDownload(f.filename, f.originalname)}
+                  style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                >
+                  {f.originalname}
+                </button>
                 <button style={{ marginLeft: 10 }} onClick={() => handleDelete(f.filename)}>Delete</button>
                 <span style={{ marginLeft: 10, color: '#888' }}>{new Date(f.time).toLocaleString()}</span>
               </li>
@@ -285,6 +315,31 @@ function AdminDashboard({ onLogout }) {
       setMessage('Deadline updated!');
     } else {
       setMessage('Failed to set deadline.');
+    }
+  };
+
+  // Download single file
+  const handleDownloadFile = async (filename, originalname) => {
+    try {
+      const res = await fetch(`${API_URL}/api/download/${filename}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalname;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const error = await res.json();
+        setMessage(error.error || 'Download failed.');
+      }
+    } catch (error) {
+      setMessage('Download failed.');
     }
   };
 
@@ -353,9 +408,12 @@ function AdminDashboard({ onLogout }) {
               <td>{sub.name}</td>
               <td>{sub.email || '-'}</td>
               <td>
-                <a href={`${API_URL}/api/download/${sub.filename}`} target="_blank" rel="noopener noreferrer">
+                <button 
+                  onClick={() => handleDownloadFile(sub.filename, sub.originalname)}
+                  style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                >
                   {sub.originalname}
-                </a>
+                </button>
               </td>
               <td>{new Date(sub.time).toLocaleString()}</td>
             </tr>
