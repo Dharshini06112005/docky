@@ -340,26 +340,64 @@ function AdminDashboard({ onLogout }) {
     }
   };
 
+  // Retry function for failed requests
+  const retryFetch = async (url, options, maxRetries = 3) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok) {
+          return response;
+        }
+        if (i === maxRetries - 1) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      } catch (error) {
+        if (i === maxRetries - 1) {
+          throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+  };
+
   // Fetch deadline, analytics, and submissions
   const fetchAll = useCallback(() => {
     setLoading(true);
     
     Promise.all([
-      fetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } })
+      retryFetch(`${API_URL}/api/deadline`, { headers: { Authorization: `Bearer ${token}` } })
         .then(res => res.json())
         .then(data => setDeadline(data.deadline))
-        .catch(err => console.error('Error fetching deadline:', err)),
+        .catch(err => {
+          console.error('Error fetching deadline:', err);
+          setDeadline(null);
+        }),
       
-      fetch(`${API_URL}/api/analytics`, { headers: { Authorization: `Bearer ${token}` } })
+      retryFetch(`${API_URL}/api/analytics`, { headers: { Authorization: `Bearer ${token}` } })
         .then(res => res.json())
         .then(setAnalytics)
-        .catch(err => console.error('Error fetching analytics:', err)),
+        .catch(err => {
+          console.error('Error fetching analytics:', err);
+          setAnalytics(null);
+        }),
       
-      fetch(`${API_URL}/api/submissions?sort=${sort}${search ? `&search=${encodeURIComponent(search)}` : ''}${filetype ? `&filetype=${encodeURIComponent(filetype)}` : ''}`, 
+      retryFetch(`${API_URL}/api/submissions?sort=${sort}${search ? `&search=${encodeURIComponent(search)}` : ''}${filetype ? `&filetype=${encodeURIComponent(filetype)}` : ''}`, 
         { headers: { Authorization: `Bearer ${token}` } })
         .then(res => res.json())
-        .then(setSubmissions)
-        .catch(err => console.error('Error fetching submissions:', err))
+        .then(data => {
+          if (Array.isArray(data)) {
+            setSubmissions(data);
+          } else {
+            console.error('Expected array but got:', data);
+            setSubmissions([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching submissions:', err);
+          setSubmissions([]);
+        })
     ]).finally(() => setLoading(false));
   }, [search, filetype, sort, token]);
 
@@ -372,7 +410,9 @@ function AdminDashboard({ onLogout }) {
     
     // Convert to ISO string for proper format
     const deadlineDate = new Date(newDeadline);
-    const isoDeadline = deadlineDate.toISOString();
+    // Ensure it's treated as local time and convert to UTC
+    const localDeadline = new Date(deadlineDate.getTime() - deadlineDate.getTimezoneOffset() * 60000);
+    const isoDeadline = localDeadline.toISOString();
     
     try {
       const res = await fetch(`${API_URL}/api/deadline`, {
@@ -416,7 +456,7 @@ function AdminDashboard({ onLogout }) {
           style={{ marginRight: 8 }}
         />
         <button type="submit">Set Deadline</button>
-        <span style={{ marginLeft: 16 }}>Current: <b>{deadline ? new Date(deadline).toLocaleString() : 'None'}</b></span>
+        <span style={{ marginLeft: 16 }}>Current: <b>{deadline ? new Date(deadline).toLocaleString('en-US', { timeZone: 'UTC' }) : 'None'}</b></span>
         {deadline && (
           <div style={{ marginTop: 8, fontSize: '0.9em', color: '#666' }}>
             Time remaining: {new Date(deadline) > new Date() ? 
@@ -425,9 +465,13 @@ function AdminDashboard({ onLogout }) {
           </div>
         )}
       </form>
-      {analytics && (
+      {analytics ? (
         <div style={{ marginBottom: 16 }}>
           <b>Analytics:</b> Users Submitted: {analytics.totalUsers} | Files Uploaded: {analytics.totalFiles} | Most Recent: {analytics.mostRecent ? `${analytics.mostRecent.name} (${new Date(analytics.mostRecent.time).toLocaleString()})` : 'N/A'}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16, color: '#666' }}>
+          <b>Analytics:</b> Loading...
         </div>
       )}
       <div style={{ marginBottom: 16 }}>
