@@ -181,3 +181,217 @@ a:hover {
   overflow: hidden;
   background: #f9fafb;
 }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  body {
+    padding: 0 1rem;
+  }
+  
+  header {
+    padding: 1.5rem 1rem 1rem 1rem;
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+  }
+  
+  .centered-card {
+    max-width: 100%;
+    margin: 2rem auto;
+    padding: 2rem 1.5rem;
+    border-radius: 12px;
+  }
+  
+  .centered-card h1 {
+    font-size: 2.2rem;
+    margin-bottom: 1.2rem;
+  }
+  
+  .button-row {
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  
+  button {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    min-height: 44px; /* Touch-friendly */
+  }
+  
+  .dashboard {
+    max-width: 100%;
+    margin: 1.5rem auto;
+    padding: 1.5rem 1rem;
+    border-radius: 12px;
+  }
+  
+  form {
+    gap: 1rem;
+    margin-top: 1.2rem;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="file"],
+  input[type="datetime-local"],
+  select {
+    padding: 1rem;
+    font-size: 1rem;
+    min-height: 44px; /* Touch-friendly */
+  }
+  
+  table {
+    font-size: 0.9rem;
+    margin-top: 1.2rem;
+  }
+  
+  th, td {
+    padding: 0.7rem 0.5rem;
+  }
+  
+  /* Mobile-specific dashboard improvements */
+  .dashboard > div:first-child {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .dashboard > div:first-child > button {
+    width: 100%;
+  }
+  
+  /* Mobile form improvements */
+  .dashboard form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .dashboard form > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .dashboard form label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Mobile table improvements */
+  .dashboard table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  /* Mobile file list improvements */
+  .dashboard ul {
+    padding-left: 1rem;
+  }
+  
+  .dashboard li {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #f9fafb;
+  }
+  
+  .dashboard li button {
+    margin: 0.25rem 0.5rem 0.25rem 0;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 0 0.5rem;
+  }
+  
+  header {
+    padding: 1rem 0.5rem;
+    font-size: 1.5rem;
+  }
+  
+  .centered-card {
+    padding: 1.5rem 1rem;
+  }
+  
+  .centered-card h1 {
+    font-size: 1.8rem;
+  }
+  
+  .dashboard {
+    padding: 1rem 0.5rem;
+  }
+  
+  button {
+    padding: 1rem;
+    font-size: 0.95rem;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="file"],
+  input[type="datetime-local"],
+  select {
+    padding: 0.8rem;
+    font-size: 0.95rem;
+  }
+  
+  /* Small screen table improvements */
+  table {
+    font-size: 0.8rem;
+  }
+  
+  th, td {
+    padding: 0.5rem 0.3rem;
+  }
+}
+
+/* Desktop site mode improvements */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .dashboard {
+    max-width: 800px;
+    padding: 2rem 1.5rem;
+  }
+  
+  .centered-card {
+    max-width: 500px;
+    padding: 2.5rem 2rem;
+  }
+}
+
+/* Large desktop improvements */
+@media (min-width: 1025px) {
+  .dashboard {
+    max-width: 900px;
+    padding: 3rem 2.5rem;
+  }
+  
+  .centered-card {
+    max-width: 550px;
+    padding: 3rem 2.5rem;
+  }
+  
+  button {
+    padding: 1rem 2.5rem;
+    font-size: 1.2rem;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="file"],
+  input[type="datetime-local"],
+  select {
+    padding: 1rem;
+    font-size: 1.1rem;
+  }
+}

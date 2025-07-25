@@ -110,7 +110,7 @@ app.post('/api/submit', requireAuth, uploadMulti.array('documents', 10), async (
     const deadline = results.rows.length > 0 ? results.rows[0].deadline : null;
 
     if (deadline && new Date() > new Date(deadline)) {
-      return res.status(403).json({ error: "Deadline is over, you can’t upload now." });
+      return res.status(403).json({ error: "Deadline is over. You cannot upload files now." });
     }
     if (!name || !req.files || req.files.length === 0) return res.status(400).json({ error: 'Name and at least one document required.' });
 

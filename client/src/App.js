@@ -261,7 +261,7 @@ function UserDashboard({ user, onLogout }) {
     }
   };
 
-  // Deadline display - show exact time as set by admin (in UTC for consistency)
+  // Deadline display - show exact time as set by admin (in IST)
   const deadlineDisplay = deadline ? 
     new Date(deadline).toLocaleString('en-US', {
       year: 'numeric',
@@ -269,7 +269,7 @@ function UserDashboard({ user, onLogout }) {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      timeZone: 'UTC',
+      timeZone: 'Asia/Kolkata',
       timeZoneName: 'short'
     }) : 'No deadline set';
   const isAfterDeadline = deadline && new Date(now) > new Date(deadline);
@@ -468,10 +468,11 @@ function AdminDashboard({ onLogout }) {
     e.preventDefault();
     if (!newDeadline) return;
     
-    // Convert datetime-local input to UTC properly
+    // Convert datetime-local input to IST and then to UTC for storage
     const deadlineDate = new Date(newDeadline);
-    // The datetime-local input is already in local time, so we need to convert to UTC
-    const utcDeadline = new Date(deadlineDate.getTime() - (deadlineDate.getTimezoneOffset() * 60000));
+    // Convert local time to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+    const utcDeadline = new Date(deadlineDate.getTime() - istOffset);
     const isoDeadline = utcDeadline.toISOString();
     
     try {
@@ -522,7 +523,7 @@ function AdminDashboard({ onLogout }) {
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
-          timeZone: 'UTC',
+          timeZone: 'Asia/Kolkata',
           timeZoneName: 'short'
         }) : 'None'}</b></span>
         {deadline && (
