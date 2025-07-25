@@ -261,7 +261,7 @@ function UserDashboard({ user, onLogout }) {
     }
   };
 
-  // Deadline display with proper timezone handling
+  // Deadline display - show exact time as set by admin (in UTC for consistency)
   const deadlineDisplay = deadline ? 
     new Date(deadline).toLocaleString('en-US', {
       year: 'numeric',
@@ -269,6 +269,7 @@ function UserDashboard({ user, onLogout }) {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'UTC',
       timeZoneName: 'short'
     }) : 'No deadline set';
   const isAfterDeadline = deadline && new Date(now) > new Date(deadline);
@@ -454,11 +455,11 @@ function AdminDashboard({ onLogout }) {
     e.preventDefault();
     if (!newDeadline) return;
     
-    // Convert to ISO string for proper format
+    // Convert datetime-local input to UTC properly
     const deadlineDate = new Date(newDeadline);
-    // Ensure it's treated as local time and convert to UTC
-    const localDeadline = new Date(deadlineDate.getTime() - deadlineDate.getTimezoneOffset() * 60000);
-    const isoDeadline = localDeadline.toISOString();
+    // The datetime-local input is already in local time, so we need to convert to UTC
+    const utcDeadline = new Date(deadlineDate.getTime() - (deadlineDate.getTimezoneOffset() * 60000));
+    const isoDeadline = utcDeadline.toISOString();
     
     try {
       const res = await fetch(`${API_URL}/api/deadline`, {
@@ -502,7 +503,15 @@ function AdminDashboard({ onLogout }) {
           style={{ marginRight: 8 }}
         />
         <button type="submit">Set Deadline</button>
-        <span style={{ marginLeft: 16 }}>Current: <b>{deadline ? new Date(deadline).toLocaleString('en-US', { timeZone: 'UTC' }) : 'None'}</b></span>
+        <span style={{ marginLeft: 16 }}>Current: <b>{deadline ? new Date(deadline).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'UTC',
+          timeZoneName: 'short'
+        }) : 'None'}</b></span>
         {deadline && (
           <div style={{ marginTop: 8, fontSize: '0.9em', color: '#666' }}>
             Time remaining: {new Date(deadline) > new Date() ? 
