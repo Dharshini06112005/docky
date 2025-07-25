@@ -468,11 +468,24 @@ function AdminDashboard({ onLogout }) {
     e.preventDefault();
     if (!newDeadline) return;
     
-    // Convert datetime-local input to IST and then to UTC for storage
-    const deadlineDate = new Date(newDeadline);
-    // Convert local time to IST (UTC+5:30)
+    // Create the deadline in IST timezone
+    // Format: YYYY-MM-DDTHH:MM (from datetime-local input)
+    const [datePart, timePart] = newDeadline.split('T');
+    const [year, month, day] = datePart.split('-');
+    const [hour, minute] = timePart.split(':');
+    
+    // Create IST date (treating the input as IST time)
+    const istDeadline = new Date(Date.UTC(
+      parseInt(year),
+      parseInt(month) - 1, // Month is 0-indexed
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute)
+    ));
+    
+    // Convert to IST by adding 5:30 hours
     const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-    const utcDeadline = new Date(deadlineDate.getTime() - istOffset);
+    const utcDeadline = new Date(istDeadline.getTime() - istOffset);
     const isoDeadline = utcDeadline.toISOString();
     
     try {
