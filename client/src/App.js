@@ -222,7 +222,7 @@ function UserDashboard({ user, onLogout }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (deadline && new Date(now) > new Date(deadline)) {
-      setMessage("Deadline is over, you can’t upload now.");
+      setMessage("Deadline is over. You cannot upload files now.");
       return;
     }
     if (!user.username || files.length === 0) {
@@ -281,6 +281,19 @@ function UserDashboard({ user, onLogout }) {
         <button onClick={onLogout}>Logout</button>
       </div>
       <div style={{ marginBottom: 10 }}>Submission Deadline: <b>{deadlineDisplay}</b></div>
+      {isAfterDeadline && (
+        <div style={{ 
+          marginBottom: 15, 
+          padding: '10px', 
+          backgroundColor: '#ffebee', 
+          border: '1px solid #f44336', 
+          borderRadius: '4px',
+          color: '#d32f2f',
+          fontWeight: 'bold'
+        }}>
+          ⚠️ Deadline has passed. You cannot upload files now.
+        </div>
+      )}
       <form onSubmit={handleSubmit}>
         <input
           type="file"
